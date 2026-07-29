@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!-- skill:chrome -->
+<style>
+/* Credit line — bottom-right */
+.design-ui-credit {
+  position: fixed;
+  bottom: 12px;
+  right: 12px;
+  font: 11px/1 system-ui, sans-serif;
+  color: rgba(128,128,128,0.5);
+  pointer-events: none;
+  z-index: 2147483647;
+  transition: opacity 0.4s ease;
+  user-select: none;
+  letter-spacing: 0.02em;
+}
+
+/* Hide chrome on touch devices */
+@media (hover: none) {
+  .design-ui-credit { display: none; }
+}
+
+/* Print fixes */
+@media print {
+  * {
+    transition: none !important;
+    animation: none !important;
+    box-shadow: none !important;
+  }
+  body {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  .design-ui-credit { display: none !important; }
+}
+
+</style>
+<script>
+(function () {
+    // Design-ui pages are single compositions, so the whole body is editable.
+    function markEditable() {
+        document.body.classList.add('artifact-editable');
+    }
+
+    // Credit badge with idle-fade. Hover devices only.
+    function initChromeUI() {
+        if (!matchMedia('(hover: hover)').matches) return;
+
+        var credit = document.createElement('div');
+        credit.className = 'design-ui-credit';
+        credit.setAttribute('aria-hidden', 'true');
+        credit.innerHTML = '\u{1F49C} by ClickUp Brain';
+        document.body.appendChild(credit);
+
+        var timer = null;
+        var fade = function (out) { credit.style.opacity = out ? '0' : ''; };
+        fade(true);
+        var show = function () {
+            fade(false);
+            clearTimeout(timer);
+            timer = setTimeout(function () { fade(true); }, 3000);
+        };
+        document.addEventListener('mousemove', show);
+        show();
+    }
+
+    function init() {
+        markEditable();
+        initChromeUI();
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+})();
+
+</script>
+<!-- /skill:chrome -->
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ReBuild UNSW: Gantt Chart</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: oklch(98% 0.004 250);
+  --surface: oklch(99.5% 0.002 250);
+  --text-primary: oklch(15% 0.01 250);
+  --text-secondary: oklch(42% 0.01 250);
+  --text-muted: oklch(58% 0.007 250);
+  --border: oklch(89% 0.006 250);
+  --border-light: oklch(93.5% 0.004 250);
+  --hover-bg: oklch(96.5% 0.005 250);
+  
+  --p1: oklch(55% 0.2 260);
+  --p2: oklch(55% 0.18 290);
+  --p3: oklch(52% 0.2 155);
+  --p4: oklch(58% 0.18 65);
+  --p5: oklch(55% 0.2 25);
+  --p6: oklch(55% 0.18 310);
+  --p7: oklch(52% 0.18 140);
+  --p8: oklch(55% 0.16 210);
+  --p9: oklch(50% 0.15 350);
+
+  --row-h: 30px;
+  --row-h-phase: 34px;
+  --sidebar-w: 360px;
+  --header-h: 52px;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text-primary);
+  font-size: 12.5px;
+  line-height: 1.35;
+  overflow: hidden;
+  height: 100vh;
+}
+
+.shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.topbar {
+  padding: 16px 24px 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 20px;
+}
+
+.topbar h1 {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.topbar .info {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  display: flex;
+  gap: 16px;
+  font-feature-settings: "tnum";
+}
+
+.topbar .info .sep { color: var(--border); }
+
+.content {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Sidebar */
+.sidebar {
+  width: var(--sidebar-w);
+  min-width: var(--sidebar-w);
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-head {
+  height: var(--header-h);
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--border);
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.sidebar-head .col-wbs { width: 48px; }
+.sidebar-head .col-name { flex: 1; }
+.sidebar-head .col-dur { width: 40px; text-align: right; }
+
+.sidebar-body { overflow-y: auto; flex: 1; }
+
+.row {
+  height: var(--row-h);
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--border-light);
+  cursor: default;
+  transition: background 100ms;
+}
+
+.row:hover { background: var(--hover-bg); }
+
+.row.phase {
+  height: var(--row-h-phase);
+  font-weight: 600;
+  background: oklch(96% 0.005 250);
+  font-size: 12.5px;
+}
+
+.row.phase:hover { background: oklch(94.5% 0.007 250); }
+
+.row.l2 { padding-left: 24px; font-size: 12px; }
+.row.l3 { padding-left: 44px; font-size: 11.5px; color: var(--text-secondary); }
+
+.row .wbs {
+  width: 48px;
+  font-size: 10.5px;
+  color: var(--text-muted);
+  font-feature-settings: "tnum";
+  flex-shrink: 0;
+}
+
+.row .name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-right: 8px;
+}
+
+.row .dur {
+  width: 40px;
+  text-align: right;
+  font-size: 10.5px;
+  color: var(--text-muted);
+  font-feature-settings: "tnum";
+  flex-shrink: 0;
+}
+
+.row .toggle-btn {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 4px;
+  cursor: pointer;
+  border-radius: 3px;
+  flex-shrink: 0;
+  transition: transform 120ms cubic-bezier(0.25,1,0.5,1);
+}
+
+.row .toggle-btn:hover { background: var(--border-light); }
+.row .toggle-btn svg { width: 9px; height: 9px; stroke: var(--text-muted); stroke-width: 2.5; fill: none; stroke-linecap: round; }
+.row.collapsed .toggle-btn { transform: rotate(-90deg); }
+.row.hidden { display: none; }
+
+/* Timeline */
+.timeline {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.tl-head {
+  height: var(--header-h);
+  border-bottom: 1px solid var(--border);
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: var(--surface);
+}
+
+.tl-head-inner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  display: flex;
+}
+
+.month-block {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border-light);
+}
+
+.month-block .label {
+  padding: 8px 10px 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0.02em;
+}
+
+.tl-body {
+  flex: 1;
+  overflow: auto;
+  position: relative;
+}
+
+.tl-canvas {
+  position: relative;
+  min-width: 100%;
+}
+
+.grid-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--border-light);
+}
+
+.grid-line.month-start { background: var(--border); }
+
+.bar-row {
+  position: relative;
+  height: var(--row-h);
+  border-bottom: 1px solid oklch(95.5% 0.003 250);
+}
+
+.bar-row.phase {
+  height: var(--row-h-phase);
+  background: oklch(97.5% 0.003 250);
+}
+
+.bar-row.hidden { display: none; }
+
+.bar {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  border-radius: 3px;
+  min-width: 2px;
+  cursor: pointer;
+  transition: filter 120ms, opacity 120ms;
+}
+
+.bar:hover { filter: brightness(1.1); z-index: 2; }
+
+.bar.phase-bar {
+  height: 20px;
+  border-radius: 4px;
+  opacity: 0.9;
+}
+
+.bar.l2-bar {
+  height: 14px;
+  opacity: 0.85;
+}
+
+.bar.l3-bar {
+  height: 10px;
+  border-radius: 2.5px;
+  opacity: 0.7;
+}
+
+/* Today */
+.today-marker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: oklch(50% 0.25 25);
+  z-index: 4;
+  opacity: 0.8;
+}
+
+.today-marker::after {
+  content: 'TODAY';
+  position: absolute;
+  top: -18px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: oklch(50% 0.25 25);
+  white-space: nowrap;
+}
+
+/* Tooltip */
+.tip {
+  position: fixed;
+  background: oklch(18% 0.01 250);
+  color: oklch(92% 0.005 250);
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 80ms;
+  z-index: 99;
+  max-width: 320px;
+  box-shadow: 0 6px 20px oklch(0% 0 0 / 0.25);
+  line-height: 1.4;
+}
+
+.tip.show { opacity: 1; }
+.tip strong { display: block; margin-bottom: 2px; font-size: 12px; }
+.tip .dates { color: oklch(70% 0.005 250); font-feature-settings: "tnum"; }
+
+/* Legend */
+.legend {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+@media (max-width: 900px) {
+  :root { --sidebar-w: 240px; }
+  .row .wbs { display: none; }
+  .row.l3 { padding-left: 30px; }
+}
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="topbar">
+    <h1>ReBuild UNSW</h1>
+    <div class="info">
+      <span>9 Jul 2026 → 3 May 2027</span>
+      <span class="sep">|</span>
+      <span>9 Phases, 120 tasks</span>
+      <span class="sep">|</span>
+      <span>Parallel paths: Dev + Recovery</span>
+    </div>
+    <div class="legend" id="legend"></div>
+  </div>
+  <div class="content">
+    <div class="sidebar">
+      <div class="sidebar-head">
+        <span class="col-wbs">WBS</span>
+        <span class="col-name">Task</span>
+        <span class="col-dur">Days</span>
+      </div>
+      <div class="sidebar-body" id="sidebarBody"></div>
+    </div>
+    <div class="timeline">
+      <div class="tl-head" id="tlHead"><div class="tl-head-inner" id="tlHeadInner"></div></div>
+      <div class="tl-body" id="tlBody"><div class="tl-canvas" id="tlCanvas"></div></div>
+    </div>
+  </div>
+</div>
+<div class="tip" id="tip"></div>
+
+<script>
+const tasks=[{"wbs":"1.0","name":"Project Initiation","level":1,"parent":null,"duration":9,"start":"2026-07-09","end":"2026-07-22"},{"wbs":"1.1","name":"Identify Customer problems","level":2,"parent":"1.0","duration":2,"start":"2026-07-09","end":"2026-07-13"},{"wbs":"1.2","name":"Prepare a Proposal","level":2,"parent":"1.0","duration":2,"start":"2026-07-13","end":"2026-07-15"},{"wbs":"1.3","name":"Project approval","level":2,"parent":"1.0","duration":2,"start":"2026-07-15","end":"2026-07-17"},{"wbs":"1.4","name":"Project Charter","level":2,"parent":"1.0","duration":3,"start":"2026-07-17","end":"2026-07-22"},{"wbs":"2.0","name":"Project Planning","level":1,"parent":null,"duration":12,"start":"2026-07-22","end":"2026-08-07"},{"wbs":"2.1","name":"Define scope","level":2,"parent":"2.0","duration":2,"start":"2026-07-22","end":"2026-07-24"},{"wbs":"2.2","name":"Develop project schedule","level":2,"parent":"2.0","duration":2,"start":"2026-07-24","end":"2026-07-28"},{"wbs":"2.3","name":"Budget Planning","level":2,"parent":"2.0","duration":2,"start":"2026-07-28","end":"2026-07-30"},{"wbs":"2.4","name":"Risk assessment","level":2,"parent":"2.0","duration":2,"start":"2026-07-30","end":"2026-08-03"},{"wbs":"2.5","name":"Communication Plan","level":2,"parent":"2.0","duration":2,"start":"2026-08-03","end":"2026-08-05"},{"wbs":"2.6","name":"Procurement planning","level":2,"parent":"2.0","duration":2,"start":"2026-08-05","end":"2026-08-07"},{"wbs":"3.0","name":"Platform Development","level":1,"parent":null,"duration":25,"start":"2026-08-07","end":"2026-10-19"},{"wbs":"3.1","name":"Gather System Requirements","level":2,"parent":"3.0","duration":3,"start":"2026-08-07","end":"2026-08-12"},{"wbs":"3.1.1","name":"Identify User requirements","level":3,"parent":"3.1","duration":1,"start":"2026-08-12","end":"2026-08-13"},{"wbs":"3.1.2","name":"Define functional Requirements","level":3,"parent":"3.1","duration":2,"start":"2026-08-13","end":"2026-08-17"},{"wbs":"3.2","name":"Design Material Passport Framework","level":2,"parent":"3.0","duration":5,"start":"2026-08-17","end":"2026-08-24"},{"wbs":"3.2.1","name":"Define Mandatory material information","level":3,"parent":"3.2","duration":1,"start":"2026-08-24","end":"2026-08-25"},{"wbs":"3.2.2","name":"Design Material passport template","level":3,"parent":"3.2","duration":2,"start":"2026-08-25","end":"2026-08-27"},{"wbs":"3.2.3","name":"Establish material classification system","level":3,"parent":"3.2","duration":2,"start":"2026-08-27","end":"2026-08-31"},{"wbs":"3.2.4","name":"Validate Framework with stakeholders","level":3,"parent":"3.2","duration":1,"start":"2026-08-31","end":"2026-09-01"},{"wbs":"3.3","name":"Design Marketplace interface","level":2,"parent":"3.0","duration":6,"start":"2026-09-01","end":"2026-09-09"},{"wbs":"3.3.1","name":"User interface","level":3,"parent":"3.3","duration":1,"start":"2026-09-09","end":"2026-09-10"},{"wbs":"3.3.2","name":"Admin interface","level":3,"parent":"3.3","duration":1,"start":"2026-09-10","end":"2026-09-11"},{"wbs":"3.3.3","name":"Material listing functionality","level":3,"parent":"3.3","duration":1,"start":"2026-09-11","end":"2026-09-14"},{"wbs":"3.3.4","name":"Setup incentive system","level":3,"parent":"3.3","duration":1,"start":"2026-09-14","end":"2026-09-15"},{"wbs":"3.3.5","name":"Integrate database","level":3,"parent":"3.3","duration":2,"start":"2026-09-15","end":"2026-09-17"},{"wbs":"3.4","name":"Develop database","level":2,"parent":"3.0","duration":6,"start":"2026-09-17","end":"2026-09-25"},{"wbs":"3.4.1","name":"Configure Material inventory","level":3,"parent":"3.4","duration":1,"start":"2026-09-25","end":"2026-09-28"},{"wbs":"3.4.2","name":"Configure Material passport","level":3,"parent":"3.4","duration":1,"start":"2026-09-28","end":"2026-09-29"},{"wbs":"3.4.3","name":"Implement user database","level":3,"parent":"3.4","duration":1,"start":"2026-09-29","end":"2026-09-30"},{"wbs":"3.4.4","name":"Integrate with incentive system","level":3,"parent":"3.4","duration":1,"start":"2026-09-30","end":"2026-10-01"},{"wbs":"3.4.5","name":"Configure data backup and recovery","level":3,"parent":"3.4","duration":2,"start":"2026-10-01","end":"2026-10-05"},{"wbs":"3.5","name":"QR code integration","level":2,"parent":"3.0","duration":1,"start":"2026-10-05","end":"2026-10-06"},{"wbs":"3.6","name":"Internal platform testing","level":2,"parent":"3.0","duration":4,"start":"2026-10-06","end":"2026-10-12"},{"wbs":"3.6.1","name":"Function, performance and security testing","level":3,"parent":"3.6","duration":2,"start":"2026-10-12","end":"2026-10-14"},{"wbs":"3.6.2","name":"User acceptance testing","level":3,"parent":"3.6","duration":1,"start":"2026-10-14","end":"2026-10-15"},{"wbs":"3.6.3","name":"Debugging","level":3,"parent":"3.6","duration":2,"start":"2026-10-15","end":"2026-10-19"},{"wbs":"4.0","name":"Material Recovery Planning","level":1,"parent":null,"duration":15,"start":"2026-08-07","end":"2026-09-15"},{"wbs":"4.1","name":"Finalize a Refurbishment Project","level":2,"parent":"4.0","duration":2,"start":"2026-08-07","end":"2026-08-11"},{"wbs":"4.2","name":"Identify Recoverable materials","level":2,"parent":"4.0","duration":4,"start":"2026-08-11","end":"2026-08-17"},{"wbs":"4.2.1","name":"Site inspection","level":3,"parent":"4.2","duration":2,"start":"2026-08-17","end":"2026-08-19"},{"wbs":"4.2.2","name":"Material identification","level":3,"parent":"4.2","duration":1,"start":"2026-08-19","end":"2026-08-20"},{"wbs":"4.2.3","name":"Quantity estimation","level":3,"parent":"4.2","duration":1,"start":"2026-08-20","end":"2026-08-21"},{"wbs":"4.3","name":"Develop recovery procedures","level":2,"parent":"4.0","duration":5,"start":"2026-08-21","end":"2026-08-28"},{"wbs":"4.3.1","name":"Recovery workflow","level":3,"parent":"4.3","duration":1,"start":"2026-08-28","end":"2026-08-31"},{"wbs":"4.3.2","name":"Safety procedures","level":3,"parent":"4.3","duration":1,"start":"2026-08-31","end":"2026-09-01"},{"wbs":"4.3.3","name":"Material handling procedures","level":3,"parent":"4.3","duration":1,"start":"2026-09-01","end":"2026-09-02"},{"wbs":"4.3.4","name":"Staff training","level":3,"parent":"4.3","duration":2,"start":"2026-09-02","end":"2026-09-04"},{"wbs":"4.4","name":"Prepare inspection criteria","level":2,"parent":"4.0","duration":3,"start":"2026-09-04","end":"2026-09-09"},{"wbs":"4.4.1","name":"Inspection and grade criteria","level":3,"parent":"4.4","duration":1,"start":"2026-09-09","end":"2026-09-10"},{"wbs":"4.4.2","name":"Staff training","level":3,"parent":"4.4","duration":2,"start":"2026-09-10","end":"2026-09-14"},{"wbs":"4.5","name":"Prepare storage area","level":2,"parent":"4.0","duration":1,"start":"2026-09-14","end":"2026-09-15"},{"wbs":"5.0","name":"Material Processing & Assessment","level":1,"parent":null,"duration":30,"start":"2026-10-19","end":"2026-12-25"},{"wbs":"5.1","name":"Collect recovered materials","level":2,"parent":"5.0","duration":7,"start":"2026-10-19","end":"2026-10-28"},{"wbs":"5.1.1","name":"Coordinate collection schedule","level":3,"parent":"5.1","duration":1,"start":"2026-10-28","end":"2026-10-29"},{"wbs":"5.1.2","name":"Recover materials from site","level":3,"parent":"5.1","duration":3,"start":"2026-10-29","end":"2026-11-03"},{"wbs":"5.1.3","name":"Transport to temporary storage","level":3,"parent":"5.1","duration":3,"start":"2026-11-03","end":"2026-11-06"},{"wbs":"5.2","name":"Material inspection","level":2,"parent":"5.0","duration":7,"start":"2026-11-03","end":"2026-11-12"},{"wbs":"5.2.1","name":"Visual and non-destructive inspection","level":3,"parent":"5.2","duration":2,"start":"2026-11-12","end":"2026-11-16"},{"wbs":"5.2.2","name":"Dimensional measurements","level":3,"parent":"5.2","duration":2,"start":"2026-11-16","end":"2026-11-18"},{"wbs":"5.2.3","name":"Defect identification","level":3,"parent":"5.2","duration":3,"start":"2026-11-18","end":"2026-11-23"},{"wbs":"5.3","name":"Clean and process materials","level":2,"parent":"5.0","duration":7,"start":"2026-11-18","end":"2026-11-27"},{"wbs":"5.3.1","name":"Remove contaminants","level":3,"parent":"5.3","duration":2,"start":"2026-11-27","end":"2026-12-01"},{"wbs":"5.3.2","name":"Minor cleaning","level":3,"parent":"5.3","duration":2,"start":"2026-12-01","end":"2026-12-03"},{"wbs":"5.3.3","name":"Prepare for storage","level":3,"parent":"5.3","duration":3,"start":"2026-12-03","end":"2026-12-08"},{"wbs":"5.4","name":"Test materials (if required)","level":2,"parent":"5.0","duration":3,"start":"2026-12-01","end":"2026-12-04"},{"wbs":"5.4.1","name":"Non-destructive testing","level":3,"parent":"5.4","duration":3,"start":"2026-12-04","end":"2026-12-09"},{"wbs":"5.5","name":"Grading and approval for reuse","level":2,"parent":"5.0","duration":6,"start":"2026-12-09","end":"2026-12-17"},{"wbs":"5.5.1","name":"Grade timber, glass and plastic","level":3,"parent":"5.5","duration":3,"start":"2026-12-17","end":"2026-12-22"},{"wbs":"5.5.2","name":"Approve for reuse","level":3,"parent":"5.5","duration":1,"start":"2026-12-22","end":"2026-12-23"},{"wbs":"5.5.3","name":"Send to inventory","level":3,"parent":"5.5","duration":2,"start":"2026-12-23","end":"2026-12-25"},{"wbs":"6.0","name":"Material Passporting & Inventory","level":1,"parent":null,"duration":15,"start":"2026-12-25","end":"2027-02-05"},{"wbs":"6.1","name":"Create Material Passport","level":2,"parent":"6.0","duration":5,"start":"2026-12-25","end":"2027-01-01"},{"wbs":"6.1.1","name":"Record material information","level":3,"parent":"6.1","duration":2,"start":"2027-01-01","end":"2027-01-05"},{"wbs":"6.1.2","name":"Record dimensions","level":3,"parent":"6.1","duration":1,"start":"2027-01-05","end":"2027-01-06"},{"wbs":"6.1.3","name":"Record test results","level":3,"parent":"6.1","duration":1,"start":"2027-01-06","end":"2027-01-07"},{"wbs":"6.1.4","name":"Assign unique material ID","level":3,"parent":"6.1","duration":1,"start":"2027-01-07","end":"2027-01-08"},{"wbs":"6.2","name":"Generate & attach QR code","level":2,"parent":"6.0","duration":1,"start":"2027-01-08","end":"2027-01-11"},{"wbs":"6.3","name":"Upload material information","level":2,"parent":"6.0","duration":4,"start":"2027-01-11","end":"2027-01-15"},{"wbs":"6.3.1","name":"Enter material details","level":3,"parent":"6.3","duration":2,"start":"2027-01-15","end":"2027-01-19"},{"wbs":"6.3.2","name":"Upload photographs","level":3,"parent":"6.3","duration":1,"start":"2027-01-19","end":"2027-01-20"},{"wbs":"6.3.3","name":"Upload inspection results","level":3,"parent":"6.3","duration":1,"start":"2027-01-20","end":"2027-01-21"},{"wbs":"6.3.4","name":"Upload to marketplace","level":3,"parent":"6.3","duration":1,"start":"2027-01-21","end":"2027-01-22"},{"wbs":"6.4","name":"Catalogue Inventory","level":2,"parent":"6.0","duration":4,"start":"2027-01-22","end":"2027-01-28"},{"wbs":"6.4.1","name":"Assign storage location","level":3,"parent":"6.4","duration":1,"start":"2027-01-28","end":"2027-01-29"},{"wbs":"6.4.2","name":"Categorize materials","level":3,"parent":"6.4","duration":2,"start":"2027-01-29","end":"2027-02-02"},{"wbs":"6.4.3","name":"Update inventory database","level":3,"parent":"6.4","duration":2,"start":"2027-02-02","end":"2027-02-04"},{"wbs":"6.5","name":"Verify inventory records","level":2,"parent":"6.0","duration":1,"start":"2027-02-04","end":"2027-02-05"},{"wbs":"7.0","name":"Marketplace Operation","level":1,"parent":null,"duration":30,"start":"2027-02-05","end":"2027-03-31"},{"wbs":"7.1","name":"Prepare and Publish listings","level":2,"parent":"7.0","duration":4,"start":"2027-02-05","end":"2027-02-11"},{"wbs":"7.2","name":"Register pilot users","level":2,"parent":"7.0","duration":8,"start":"2027-02-11","end":"2027-02-23"},{"wbs":"7.2.1","name":"Create and activate user accounts","level":3,"parent":"7.2","duration":3,"start":"2027-02-23","end":"2027-02-26"},{"wbs":"7.2.2","name":"Verify user eligibility","level":3,"parent":"7.2","duration":2,"start":"2027-02-26","end":"2027-03-02"},{"wbs":"7.2.3","name":"Assign user permissions","level":3,"parent":"7.2","duration":3,"start":"2027-03-02","end":"2027-03-05"},{"wbs":"7.3","name":"User and vendor training","level":2,"parent":"7.0","duration":6,"start":"2027-03-05","end":"2027-03-15"},{"wbs":"7.3.1","name":"Prepare training materials","level":3,"parent":"7.3","duration":3,"start":"2027-03-05","end":"2027-03-10"},{"wbs":"7.3.2","name":"Prepare user guides","level":3,"parent":"7.3","duration":3,"start":"2027-03-10","end":"2027-03-15"},{"wbs":"7.4","name":"Order fulfilment","level":2,"parent":"7.0","duration":6,"start":"2027-03-15","end":"2027-03-23"},{"wbs":"7.5","name":"Monitor pilot operation","level":2,"parent":"7.0","duration":6,"start":"2027-03-23","end":"2027-03-31"},{"wbs":"8.0","name":"Monitoring & Evaluation","level":1,"parent":null,"duration":20,"start":"2027-02-05","end":"2027-04-08"},{"wbs":"8.1","name":"Monitor project KPIs","level":2,"parent":"8.0","duration":5,"start":"2027-02-05","end":"2027-02-12"},{"wbs":"8.1.1","name":"Collect KPI data","level":3,"parent":"8.1","duration":2,"start":"2027-02-12","end":"2027-02-16"},{"wbs":"8.1.2","name":"Compare against targets","level":3,"parent":"8.1","duration":2,"start":"2027-02-16","end":"2027-02-18"},{"wbs":"8.1.3","name":"Identify performance trends","level":3,"parent":"8.1","duration":2,"start":"2027-02-18","end":"2027-02-22"},{"wbs":"8.1.4","name":"Report KPI status","level":3,"parent":"8.1","duration":1,"start":"2027-02-22","end":"2027-02-23"},{"wbs":"8.2","name":"Collect Stakeholder feedback","level":2,"parent":"8.0","duration":4,"start":"2027-02-23","end":"2027-03-01"},{"wbs":"8.2.1","name":"Prepare survey/questionnaire","level":3,"parent":"8.2","duration":2,"start":"2027-03-01","end":"2027-03-03"},{"wbs":"8.2.2","name":"Conduct feedback interviews","level":3,"parent":"8.2","duration":2,"start":"2027-03-03","end":"2027-03-05"},{"wbs":"8.2.3","name":"Document findings","level":3,"parent":"8.2","duration":2,"start":"2027-03-05","end":"2027-03-09"},{"wbs":"8.3","name":"Evaluate performance","level":2,"parent":"8.0","duration":5,"start":"2027-03-09","end":"2027-03-16"},{"wbs":"8.3.1","name":"Assess platform performance","level":3,"parent":"8.3","duration":1,"start":"2027-03-16","end":"2027-03-17"},{"wbs":"8.3.2","name":"Review material info accuracy","level":3,"parent":"8.3","duration":2,"start":"2027-03-17","end":"2027-03-19"},{"wbs":"8.3.3","name":"Evaluate logistics","level":3,"parent":"8.3","duration":1,"start":"2027-03-19","end":"2027-03-22"},{"wbs":"8.3.4","name":"Analyse costs vs revenue","level":3,"parent":"8.3","duration":1,"start":"2027-03-22","end":"2027-03-23"},{"wbs":"8.4","name":"Recommendations","level":2,"parent":"8.0","duration":6,"start":"2027-03-23","end":"2027-03-31"},{"wbs":"8.4.1","name":"Identify improvements","level":3,"parent":"8.4","duration":1,"start":"2027-03-31","end":"2027-04-01"},{"wbs":"8.4.2","name":"Prioritize recommendations","level":3,"parent":"8.4","duration":1,"start":"2027-04-01","end":"2027-04-02"},{"wbs":"8.4.3","name":"Prepare implementation roadmap","level":3,"parent":"8.4","duration":2,"start":"2027-04-02","end":"2027-04-06"},{"wbs":"8.4.4","name":"Present recommendations","level":3,"parent":"8.4","duration":2,"start":"2027-04-06","end":"2027-04-08"},{"wbs":"9.0","name":"Project Closure","level":1,"parent":null,"duration":6,"start":"2027-04-08","end":"2027-05-03"},{"wbs":"9.1","name":"Final project documentation","level":2,"parent":"9.0","duration":1,"start":"2027-04-08","end":"2027-04-09"},{"wbs":"9.1.1","name":"Compile project records","level":3,"parent":"9.1","duration":1,"start":"2027-04-09","end":"2027-04-12"},{"wbs":"9.1.2","name":"Archive project documents","level":3,"parent":"9.1","duration":1,"start":"2027-04-12","end":"2027-04-13"},{"wbs":"9.2","name":"Lessons Learned","level":2,"parent":"9.0","duration":1,"start":"2027-04-13","end":"2027-04-14"},{"wbs":"9.2.1","name":"Compile Lessons learned registry","level":3,"parent":"9.2","duration":1,"start":"2027-04-14","end":"2027-04-15"},{"wbs":"9.2.2","name":"Document success and improvements","level":3,"parent":"9.2","duration":1,"start":"2027-04-15","end":"2027-04-16"},{"wbs":"9.2.3","name":"Archive lessons learned","level":3,"parent":"9.2","duration":1,"start":"2027-04-16","end":"2027-04-19"},{"wbs":"9.3","name":"Project report","level":2,"parent":"9.0","duration":1,"start":"2027-04-19","end":"2027-04-20"},{"wbs":"9.4","name":"Formal Handover and Sign-off","level":2,"parent":"9.0","duration":2,"start":"2027-04-20","end":"2027-04-22"},{"wbs":"9.4.1","name":"Handover deliverables","level":3,"parent":"9.4","duration":1,"start":"2027-04-22","end":"2027-04-23"},{"wbs":"9.4.2","name":"Transfer documentation","level":3,"parent":"9.4","duration":1,"start":"2027-04-23","end":"2027-04-26"},{"wbs":"9.4.3","name":"Confirm stakeholder acceptance","level":3,"parent":"9.4","duration":1,"start":"2027-04-26","end":"2027-04-27"},{"wbs":"9.4.4","name":"Obtain signed closure document","level":3,"parent":"9.4","duration":1,"start":"2027-04-27","end":"2027-04-28"},{"wbs":"9.5","name":"Formal Project Closure","level":2,"parent":"9.0","duration":1,"start":"2027-04-28","end":"2027-04-29"},{"wbs":"9.5.1","name":"Release project resources","level":3,"parent":"9.5","duration":1,"start":"2027-04-29","end":"2027-04-30"},{"wbs":"9.5.2","name":"Officially close the project","level":3,"parent":"9.5","duration":1,"start":"2027-04-30","end":"2027-05-03"}];
+
+const phaseColors = {'1.0':'var(--p1)','2.0':'var(--p2)','3.0':'var(--p3)','4.0':'var(--p4)','5.0':'var(--p5)','6.0':'var(--p6)','7.0':'var(--p7)','8.0':'var(--p8)','9.0':'var(--p9)'};
+const phaseNames = ['Initiation','Planning','Platform Dev','Recovery','Processing','Passporting','Marketplace','Monitoring','Closure'];
+const phaseKeys = ['1.0','2.0','3.0','4.0','5.0','6.0','7.0','8.0','9.0'];
+
+function getPhaseColor(t){return phaseColors[t.wbs.split('.')[0]+'.0']||'var(--p1)';}
+
+const pStart = new Date('2026-07-09');
+const pEnd = new Date('2027-05-10');
+const dayW = 4.5;
+const totalDays = Math.ceil((pEnd-pStart)/(864e5));
+const totalW = totalDays * dayW;
+const collapsed = new Set();
+
+function fmtDate(s){const d=new Date(s);return d.toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'});}
+
+function isHidden(t){
+  let cur=t;
+  while(cur.parent){
+    if(collapsed.has(cur.parent))return true;
+    cur=tasks.find(x=>x.wbs===cur.parent);
+    if(!cur)break;
+  }
+  return false;
+}
+
+function render(){
+  const sb=document.getElementById('sidebarBody');
+  const cv=document.getElementById('tlCanvas');
+  sb.innerHTML='';cv.innerHTML='';
+  cv.style.width=totalW+'px';
+
+  // Grid lines
+  let d=new Date(pStart);
+  while(d<=pEnd){
+    if(d.getDay()===1){
+      const off=Math.floor((d-pStart)/864e5)*dayW;
+      const ln=document.createElement('div');
+      ln.className='grid-line'+(d.getDate()<=7?' month-start':'');
+      ln.style.left=off+'px';
+      cv.appendChild(ln);
+    }
+    d.setDate(d.getDate()+1);
+  }
+
+  // Today
+  const today=new Date('2026-07-29');
+  const tOff=Math.floor((today-pStart)/864e5)*dayW;
+  if(tOff>0&&tOff<totalW){
+    const tm=document.createElement('div');
+    tm.className='today-marker';tm.style.left=tOff+'px';
+    cv.appendChild(tm);
+  }
+
+  tasks.forEach(t=>{
+    const hidden=isHidden(t);
+    const hasKids=tasks.some(x=>x.parent===t.wbs);
+    const isCol=collapsed.has(t.wbs);
+
+    // Sidebar row
+    const row=document.createElement('div');
+    let cls='row';
+    if(t.level===1)cls+=' phase';
+    else if(t.level===2)cls+=' l2';
+    else cls+=' l3';
+    if(isCol)cls+=' collapsed';
+    if(hidden)cls+=' hidden';
+    row.className=cls;
+
+    let inner='';
+    if(hasKids){
+      inner+=`<span class="toggle-btn"><svg viewBox="0 0 10 10"><polyline points="2,3 5,7 8,3"/></svg></span>`;
+    } else {
+      inner+=`<span style="width:22px;flex-shrink:0"></span>`;
+    }
+    inner+=`<span class="wbs">${t.wbs}</span><span class="name">${t.name}</span><span class="dur">${t.duration}d</span>`;
+    row.innerHTML=inner;
+
+    if(hasKids){
+      row.querySelector('.toggle-btn').addEventListener('click',()=>{
+        if(collapsed.has(t.wbs))collapsed.delete(t.wbs);else collapsed.add(t.wbs);
+        render();
+      });
+    }
+    sb.appendChild(row);
+
+    // Bar row
+    const br=document.createElement('div');
+    br.className='bar-row'+(t.level===1?' phase':'')+(hidden?' hidden':'');
+
+    const s=new Date(t.start);
+    const e=new Date(t.end);
+    const left=Math.max(0,Math.floor((s-pStart)/864e5))*dayW;
+    const w=Math.max(2,Math.floor((e-s)/864e5)*dayW);
+
+    const bar=document.createElement('div');
+    bar.className='bar '+(t.level===1?'phase-bar':t.level===2?'l2-bar':'l3-bar');
+    bar.style.left=left+'px';
+    bar.style.width=w+'px';
+    bar.style.background=getPhaseColor(t);
+
+    bar.addEventListener('mouseenter',ev=>showTip(ev,t));
+    bar.addEventListener('mousemove',ev=>moveTip(ev));
+    bar.addEventListener('mouseleave',hideTip);
+
+    br.appendChild(bar);
+    cv.appendChild(br);
+  });
+
+  cv.style.height=sb.scrollHeight+'px';
+  renderHead();
+}
+
+function renderHead(){
+  const hi=document.getElementById('tlHeadInner');
+  hi.innerHTML='';hi.style.width=totalW+'px';
+  const mNames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  let d=new Date(pStart);
+  let months=[];
+  while(d<=pEnd){
+    const k=d.getFullYear()+'-'+d.getMonth();
+    if(!months.length||months[months.length-1].k!==k){
+      months.push({k,y:d.getFullYear(),m:d.getMonth(),days:0});
+    }
+    months[months.length-1].days++;
+    d.setDate(d.getDate()+1);
+  }
+  months.forEach(m=>{
+    const block=document.createElement('div');
+    block.className='month-block';
+    block.style.width=(m.days*dayW)+'px';
+    block.innerHTML=`<span class="label">${mNames[m.m]} ${m.y}</span>`;
+    hi.appendChild(block);
+  });
+}
+
+function showTip(ev,t){
+  const tip=document.getElementById('tip');
+  tip.innerHTML=`<strong>${t.wbs} ${t.name}</strong><span class="dates">${fmtDate(t.start)} \u2192 ${fmtDate(t.end)} (${t.duration} days)</span>`;
+  tip.classList.add('show');
+  moveTip(ev);
+}
+function moveTip(ev){
+  const tip=document.getElementById('tip');
+  tip.style.left=(ev.clientX+14)+'px';
+  tip.style.top=(ev.clientY-44)+'px';
+}
+function hideTip(){document.getElementById('tip').classList.remove('show');}
+
+// Sync scroll
+document.getElementById('tlBody').addEventListener('scroll',function(){
+  document.getElementById('sidebarBody').scrollTop=this.scrollTop;
+  document.getElementById('tlHeadInner').style.transform=`translateX(-${this.scrollLeft}px)`;
+});
+document.getElementById('sidebarBody').addEventListener('scroll',function(){
+  document.getElementById('tlBody').scrollTop=this.scrollTop;
+});
+
+// Legend
+const leg=document.getElementById('legend');
+phaseKeys.forEach((k,i)=>{leg.innerHTML+=`<span class="legend-item"><span class="legend-dot" style="background:var(--p${i+1})"></span>${phaseNames[i]}</span>`;});
+
+// Start with level 3 collapsed
+tasks.filter(t=>t.level===2&&tasks.some(c=>c.parent===t.wbs)).forEach(t=>collapsed.add(t.wbs));
+render();
+</script>
+</body>
+</html>
